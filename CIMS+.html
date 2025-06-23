@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GROCERY STOCK LIST</title>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:Arial,sans-serif; }
+    body, html { height:100%; }
+    .header, .footer {
+      background:#006699;
+      color:white;
+      padding:12px 20px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+    }
+    .header-title {
+      flex: 1;
+      text-align: center;
+      font-weight: bold;
+      font-size: 1.2rem;
+    }
+    .container {
+      display: flex;
+      flex-direction: row;
+      height: calc(100vh - 100px);
+    }
+    .resizable {
+      resize: horizontal;
+      overflow: auto;
+      min-width: 180px;
+      max-width: 300px;
+    }
+    .sidebar, .rightbar {
+      background: #d0e6f6;
+      padding: 20px;
+      flex-shrink: 0;
+    }
+    .main-content {
+      flex: 1;
+      padding: 20px;
+      background: white;
+      overflow: auto;
+      border-left: 2px solid #c0d6e4;
+      min-width: 0;
+    }
+    ul { list-style: none; padding-left: 0; }
+    li { margin: 10px 0; cursor: pointer; color: #003049; font-weight: bold; }
+    li span.icon { margin-right: 8px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      font-size: 0.95em;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    td[contenteditable] { background: #eef; }
+    button, .link-button {
+      padding: 6px 14px;
+      background: #007acc;
+      color: white;
+      border: none;
+      margin: 10px 5px;
+      cursor: pointer;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    button:hover { background: #005fa3; }
+    .hidden { display: none; }
+    .footer {
+      justify-content: center;
+      font-weight: bold;
+    }
+    input[type="file"] {
+      margin: 15px 0;
+    }
+    .icon-btn {
+      background: none;
+      border: none;
+      color: #007acc;
+      font-size: 1.2em;
+      cursor: pointer;
+      margin: 0 5px;
+      padding: 2px 6px;
+    }
+    .icon-btn:hover { color: #005fa3; }
+    .person-list {
+      margin-top: 20px;
+      border-top:1px solid #bbb;
+      padding-top:10px;
+    }
+    .person-list-title {
+      font-weight:bold;
+      margin-bottom:8px;
+      color:#005fa3;
+    }
+    .person-btn {
+      display:block;
+      margin:4px 0;
+      background:#fff;
+      color:#007acc;
+      border:1px solid #007acc;
+      border-radius:4px;
+      padding:4px 10px;
+      text-align:left;
+      cursor:pointer;
+    }
+    .person-btn.selected {
+      background:#007acc;
+      color:#fff;
+    }
+    @media(max-width: 768px) {
+      .container {
+        flex-direction: column;
+        height: auto;
+      }
+      .resizable {
+        width: 100% !important;
+        resize: none;
+      }
+    }
+    @media print {
+      body * { visibility: hidden !important; }
+      .main-content, .main-content * { visibility: visible !important; }
+      .main-content { position: absolute; left: 0; top: 0; width: 100%; }
+      .header, .footer, .sidebar, .rightbar, button, input, .hidden { display: none !important; }
+      table th, table td { font-size: 14px; }
+      table th:nth-child(7), table td:nth-child(7) { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div><strong>CIMS+</strong></div>
+    <div class="header-title">GROCERY STOCK LIST</div>
+    <div>
+      <button onclick="shareLink()" title="Share Link">🔗</button>
+      <button onclick="logout()" title="Logout">🚪 Logout</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="sidebar resizable">
+      <h3>Menu</h3>
+      <ul>
+        <li onclick="showPage('stock')"><span class="icon">📋</span>Stock List</li>
+        <li onclick="showPage('demand')"><span class="icon">📝</span>Make Demand</li>
+        <li onclick="showPage('all-demands')"><span class="icon">📑</span>All Demands</li>
+        <li onclick="shareWhatsApp()"><span class="icon">📱</span>WhatsApp Share</li>
+      </ul>
+      <div class="person-list">
+        <div class="person-list-title">
+          Persons
+          <button class="icon-btn" onclick="showPage('add-person')" title="Add Person">➕</button>
+        </div>
+        <div id="personList"></div>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <!-- Stock List Page -->
+      <div id="stock-page">
+        <h2>Current Grocery Stock</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>S/No</th>
+              <th>Index No</th>
+              <th>Description</th>
+              <th>In-Stock</th>
+              <th>VAT+Rate</th>
+              <th>Remarks</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="stock-body"></tbody>
+        </table>
+        <button onclick="addItem()">+ Add Item</button>
+      </div>
+
+      <!-- Demand Page -->
+      <div id="demand-page" class="hidden">
+        <h2>Family Grocery Demand</h2>
+        <div id="demand-person-title" style="font-weight:bold;margin-bottom:10px;"></div>
+        <table>
+          <thead>
+            <tr>
+              <th>S/No</th>
+              <th>Index No</th>
+              <th>Description</th>
+              <th>Available</th>
+              <th>Required Qty</th>
+            </tr>
+          </thead>
+          <tbody id="demand-body"></tbody>
+        </table>
+        <button onclick="submitDemand()">Submit Demand</button>
+      </div>
+
+      <!-- Add Person Page -->
+      <div id="add-person-page" class="hidden">
+        <h2>Add Person</h2>
+        <form onsubmit="event.preventDefault();addPerson();">
+          <input type="text" id="personName" placeholder="Enter person name" required style="padding:8px;width:220px;">
+          <button type="submit">Add & Make Demand</button>
+        </form>
+      </div>
+
+      <!-- All Demands Page -->
+      <div id="all-demands-page" class="hidden">
+        <h2>All Persons' Grocery Demand List</h2>
+        <button onclick="exportAllDemandsExcel()">⬇️ Export to Excel</button>
+        <table>
+          <thead>
+            <tr>
+              <th>S/No</th>
+              <th>Person Name</th>
+              <th>Index No</th>
+              <th>Description</th>
+              <th>Required Qty</th>
+              <th>VAT+Rate</th>
+              <th>Remarks</th>
+            </tr>
+          </thead>
+          <tbody id="all-demands-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Import PDF Page -->
+      <div id="import-pdf-page" class="hidden">
+        <h2>Import PDF File</h2>
+        <input type="file" accept="application/pdf" />
+        <p style="color:#888;">(PDF import is for your records only. To add items, please convert PDF to Excel and use "Import Excel Sheet".)</p>
+      </div>
+
+      <!-- Convert PDF to Excel Page -->
+      <div id="convert-pdf-excel-page" class="hidden">
+        <h2>Convert PDF to Excel</h2>
+        <ol>
+          <li>Open your PDF in <b>MS Office 2016</b> or <b>Adobe Acrobat</b>.</li>
+          <li>Use <b>Save As</b> or <b>Export</b> to convert PDF to Excel (.xlsx).</li>
+          <li>Download the Excel file and use the <b>Import Excel Sheet</b> option.</li>
+        </ol>
+        <p style="color:#888;">(This step is done outside the browser for best accuracy.)</p>
+      </div>
+
+      <!-- Import Excel Page -->
+      <div id="import-excel-page" class="hidden">
+        <h2>Import Excel Sheet</h2>
+        <label for="excelFile">
+          <button class="icon-btn" title="Import Excel File">📥</button>
+          <span style="vertical-align:middle;font-weight:bold;">Choose Excel File</span>
+        </label>
+        <input type="file" id="excelFile" accept=".xlsx,.xls" onchange="handleExcelImport(event)" style="display:inline;" />
+        <p>Upload your Excel file here to add all grocery items to the stock list.<br>
+        <b>Excel columns order:</b> <i>Index No | Description | In-Stock | VAT+Rate | Remarks</i></p>
+      </div>
+    </div>
+
+    <div class="rightbar resizable">
+      <h3>Info</h3>
+      <p>Shop: GROCERY(51)</p>
+      <p>Counter: GROCERY(1)</p>
+      <p>User: SYSADMIN_12</p>
+      <hr>
+      <button onclick="showPage('import-pdf')"><span title="Import PDF">📄</span> Import PDF File</button>
+      <button onclick="showPage('convert-pdf-excel')"><span title="Convert PDF to Excel">🔄</span> Convert PDF → Excel</button>
+      <button onclick="showPage('import-excel')"><span title="Import Excel">📥</span> Import Excel Sheet</button>
+    </div>
+  </div>
+
+  <div class="footer">@Made in India 2025</div>
+
+  <script>
+    // Initial stock data
+    let stock = [
+      { index:'001', desc:'Rice 1kg', inStock:100, vat:'5%', remarks:'-', balance:100 },
+      { index:'002', desc:'Dal 1kg', inStock:50, vat:'5%', remarks:'-', balance:50 }
+    ];
+    let demandItems = [];
+    let persons = [];
+    let allDemands = []; // {person, index, desc, qty, vat, remarks}
+    let activePerson = null;
+
+    // Sidebar: Render person list
+    function renderPersonList() {
+      const list = document.getElementById('personList');
+      list.innerHTML = '';
+      persons.forEach((p, idx) => {
+        list.innerHTML += `<button class="person-btn${activePerson===p?' selected':''}" onclick="selectPerson('${p}')">${p}</button>`;
+      });
+    }
+
+    function selectPerson(name) {
+      activePerson = name;
+      showPage('demand');
+    }
+
+    // Render stock table
+    function renderStock() {
+      const tbody = document.getElementById('stock-body');
+      tbody.innerHTML = '';
+      stock.forEach((it,i)=> {
+        tbody.innerHTML += `<tr data-id="${i}">
+          <td>${i+1}</td>
+          <td contenteditable oninput="cellEdit(${i},'index',this.innerText)">${it.index}</td>
+          <td contenteditable oninput="cellEdit(${i},'desc',this.innerText)">${it.desc}</td>
+          <td contenteditable oninput="cellEdit(${i},'inStock',this.innerText)">${it.inStock}</td>
+          <td contenteditable oninput="cellEdit(${i},'vat',this.innerText)">${it.vat}</td>
+          <td contenteditable oninput="cellEdit(${i},'remarks',this.innerText)">${it.remarks||''}</td>
+          <td>
+            <button onclick="updateStock(${i})" title="Save"><span>💾</span></button>
+          </td>
+        </tr>`;
+      });
+    }
+
+    // Cell edit handler
+    function cellEdit(i, field, val) {
+      if(field==='inStock') {
+        stock[i][field] = parseInt(val) || 0;
+        stock[i].balance = stock[i][field];
+      } else {
+        stock[i][field] = val;
+      }
+    }
+
+    function updateStock(i) {
+      renderStock();
+      alert('Stock updated.');
+    }
+
+    function addItem() {
+      stock.push({ index:'', desc:'', inStock:0, vat:'0%', remarks:'', balance:0 });
+      renderStock();
+    }
+
+    function showPage(page) {
+      ['stock-page','demand-page','import-pdf-page','convert-pdf-excel-page','import-excel-page','add-person-page','all-demands-page']
+        .forEach(id => document.getElementById(id).classList.add('hidden'));
+      if (page === 'stock') document.getElementById('stock-page').classList.remove('hidden');
+      if (page === 'demand') {
+        if(!activePerson) {
+          alert("Select or add a person first!");
+          showPage('add-person');
+          return;
+        }
+        document.getElementById('demand-page').classList.remove('hidden');
+        document.getElementById('demand-person-title').textContent = "Person: " + activePerson;
+        renderDemand();
+      }
+      if (page === 'import-pdf') document.getElementById('import-pdf-page').classList.remove('hidden');
+      if (page === 'convert-pdf-excel') document.getElementById('convert-pdf-excel-page').classList.remove('hidden');
+      if (page === 'import-excel') document.getElementById('import-excel-page').classList.remove('hidden');
+      if (page === 'add-person') document.getElementById('add-person-page').classList.remove('hidden');
+      if (page === 'all-demands') {
+        document.getElementById('all-demands-page').classList.remove('hidden');
+        renderAllDemands();
+      }
+    }
+
+    function renderDemand() {
+      demandItems = stock.map(it => ({
+        index: it.index,
+        desc: it.desc,
+        avail: it.balance,
+        req: 0,
+        vat: it.vat,
+        remarks: it.remarks
+      }));
+      const tbody = document.getElementById('demand-body');
+      tbody.innerHTML = '';
+      demandItems.forEach((it, i) => {
+        tbody.innerHTML += `<tr>
+          <td>${i+1}</td>
+          <td>${it.index}</td>
+          <td>${it.desc}</td>
+          <td id="avail-${i}">${it.avail}</td>
+          <td><input type="number" min="0" max="${it.avail}" value="0" oninput="setReq(${i},this.value)"></td>
+        </tr>`;
+      });
+    }
+
+    function setReq(i, val) {
+      demandItems[i].req = parseInt(val) || 0;
+      const availCell = document.getElementById('avail-' + i);
+      availCell.textContent = Math.max(0, stock[i].balance - demandItems[i].req);
+    }
+
+    function submitDemand() {
+      if (!activePerson) { alert("No person selected!"); return; }
+      let valid = false;
+      demandItems.forEach((d, i) => {
+        if (d.req > 0 && d.req <= stock[i].balance) {
+          // Save the demand with person name
+          allDemands.push({
+            person: activePerson,
+            index: d.index,
+            desc: d.desc,
+            qty: d.req,
+            vat: d.vat,
+            remarks: d.remarks
+          });
+          stock[i].balance -= d.req;
+          stock[i].inStock = stock[i].balance;
+          valid = true;
+        }
+      });
+      if (valid) {
+        renderStock();
+        alert('Demand submitted for ' + activePerson + '!');
+        showPage('all-demands');
+      } else {
+        alert('No valid demand quantities entered.');
+      }
+    }
+
+    function addPerson() {
+      const name = document.getElementById('personName').value.trim();
+      if (!name) { alert("Enter a name!"); return; }
+      if (persons.includes(name)) {
+        alert("Person already exists! Select from the list.");
+        activePerson = name;
+      } else {
+        persons.push(name);
+        activePerson = name;
+      }
+      renderPersonList();
+      showPage('demand');
+      document.getElementById('personName').value = '';
+    }
+
+    function renderAllDemands() {
+      const tbody = document.getElementById('all-demands-body');
+      tbody.innerHTML = '';
+      allDemands.forEach((d, i) => {
+        tbody.innerHTML += `<tr>
+          <td>${i+1}</td>
+          <td>${d.person}</td>
+          <td>${d.index}</td>
+          <td>${d.desc}</td>
+          <td>${d.qty}</td>
+          <td>${d.vat}</td>
+          <td>${d.remarks||''}</td>
+        </tr>`;
+      });
+    }
+
+    function exportAllDemandsExcel() {
+      if(allDemands.length===0) { alert("No demands to export!"); return; }
+      const ws_data = [
+        ["S/No","Person Name","Index No","Description","Required Qty","VAT+Rate","Remarks"]
+      ];
+      allDemands.forEach((d,i) => {
+        ws_data.push([
+          i+1, d.person, d.index, d.desc, d.qty, d.vat, d.remarks||''
+        ]);
+      });
+      const ws = XLSX.utils.aoa_to_sheet(ws_data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Demands");
+      XLSX.writeFile(wb, "All_Persons_Grocery_Demands.xlsx");
+    }
+
+    function shareWhatsApp() {
+      const txt = stock.map((it, i) => `${i+1}. ${it.desc} – Avail: ${it.balance}`).join('\n');
+      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(txt)}`, '_blank');
+    }
+
+    function shareLink() {
+      if (navigator.share) {
+        navigator.share({
+          title: document.title,
+          url: window.location.href
+        });
+      } else {
+        prompt('Copy this link:', window.location.href);
+      }
+    }
+
+    function logout() {
+      alert('You have been logged out.');
+      window.location.reload();
+    }
+
+    // Excel import handler
+    function handleExcelImport(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type: 'array'});
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(sheet, {header:1});
+        stock = rows.slice(1).filter(row=>row.length>1).map(row => ({
+          index: row[0] || '',       // Index No
+          desc: row[1] || '',        // Description
+          inStock: parseInt(row[2]) || 0,      // In-Stock
+          vat: row[3] || '0%',       // VAT+Rate
+          remarks: row[4] || '',
+          balance: parseInt(row[2]) || 0
+        }));
+        renderStock();
+        alert('Stock list imported from Excel!');
+        showPage('stock');
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // Initial render
+    renderStock();
+    renderPersonList();
+  </script>
+
+</body>
+</html>
